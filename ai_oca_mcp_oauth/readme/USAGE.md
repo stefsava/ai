@@ -12,5 +12,5 @@
 
 ## Disconnecting a client
 
-- Open your preferences, tab **Account Security**: the clients you connected are
+- Open your preferences, tab **Security**: the clients you connected are
   listed under **AI Clients**. Click **Disconnect** on the one to remove.

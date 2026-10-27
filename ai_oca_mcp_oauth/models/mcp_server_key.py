@@ -13,13 +13,10 @@ class McpServerKey(models.Model):
         help="Hash of the OAuth authorization code the key was issued for.",
     )
 
-    _sql_constraints = [
-        (
-            "oauth_code_hash_uniq",
-            "unique(oauth_code_hash)",
-            "An authorization code gives one key only.",
-        ),
-    ]
+    _oauth_code_hash_uniq = models.Constraint(
+        "unique (oauth_code_hash)",
+        "An authorization code gives one key only.",
+    )
 
     def action_disconnect(self):
         """Let users expire the keys their AI clients got through OAuth."""

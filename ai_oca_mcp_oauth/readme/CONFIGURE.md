@@ -1,6 +1,7 @@
-- Open the MCP server in `AI > MCP Server` and check **OAuth**.
-- Add the users who may connect AI clients to the group **Connect AI Clients
-  with OAuth** (`Settings > Users & Companies > Groups`, in developer mode).
+- Open the MCP server in `Settings > Technical > AI > MCP Server` and check **OAuth**.
+- Give the users who may connect AI clients the access right **AI Clients:
+  Connect AI Clients with OAuth** (`Settings > Users & Companies > Users`,
+  section **Productivity**).
 - Make sure the `web.base.url` system parameter is the URL clients use to reach
   Odoo (set `web.base.url.freeze` to `True` behind a reverse proxy). The
   server's **URL** must match the URL entered in the client exactly.

@@ -28,9 +28,6 @@ class TestMcpOAuth(HttpCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        # Odoo 16 may keep a routing map built by the at_install tests of a
-        # module loaded before this one, without the routes of this module.
-        cls.env["ir.http"]._clear_routing_map()
         cls.server = cls.env["mcp.server"].create(
             {
                 "name": "Test Server",
@@ -334,7 +331,7 @@ class TestMcpOAuth(HttpCase):
 
     def test_key_of_user_removed_from_group(self):
         token = self._get_token()
-        self.user.groups_id -= self.env.ref("ai_oca_mcp_oauth.group_mcp_oauth")
+        self.user.group_ids -= self.env.ref("ai_oca_mcp_oauth.group_mcp_oauth")
         self.assertEqual(self._mcp_initialize(self.server, token).status_code, 401)
 
     def test_disable_oauth_expires_oauth_keys(self):
@@ -354,7 +351,7 @@ class TestMcpOAuth(HttpCase):
 
     def test_uninstall_expires_oauth_keys(self):
         self._get_token()
-        uninstall_hook(self.env.cr, self.registry)
+        uninstall_hook(self.env)
         self.assertEqual(self.server.key_ids.state, "expired")
 
     def test_deny(self):
@@ -444,6 +441,6 @@ class TestMcpOAuth(HttpCase):
 
     def test_user_removed_from_group(self):
         code = self._get_code()
-        self.user.groups_id -= self.env.ref("ai_oca_mcp_oauth.group_mcp_oauth")
+        self.user.group_ids -= self.env.ref("ai_oca_mcp_oauth.group_mcp_oauth")
         response = self._token(code)
         self.assertEqual(response.json()["error"], "invalid_grant")

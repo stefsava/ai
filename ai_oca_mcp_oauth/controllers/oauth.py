@@ -9,7 +9,7 @@ import secrets
 import time
 from urllib.parse import urlencode, urlsplit
 
-from odoo import _, http
+from odoo import http
 from odoo.http import request
 from odoo.tools.misc import hmac as odoo_hmac
 
@@ -191,6 +191,8 @@ class McpOAuthController(http.Controller):
         auth="none",
         methods=["POST"],
         csrf=False,
+        # Routes with auth="none" get a read-only cursor by default.
+        readonly=False,
     )
     def oauth_token(self, key, **kwargs):
         server = request.env["mcp.server"]._get_oauth_server(key)
@@ -244,15 +246,15 @@ class McpOAuthController(http.Controller):
     def _check_authorize_request(self, server, params):
         """Return an error message, or None when the request is valid."""
         if not self._is_allowed_redirect_uri(params.get("redirect_uri")):
-            return _("The application's redirect URI is not allowed.")
+            return request.env._("The application's redirect URI is not allowed.")
         if params.get("response_type") != "code":
-            return _("Unsupported response type.")
+            return request.env._("Unsupported response type.")
         if not params.get("code_challenge") or (
             params.get("code_challenge_method") != "S256"
         ):
-            return _("The application must use PKCE with the S256 method.")
+            return request.env._("The application must use PKCE with the S256 method.")
         if not server._is_oauth_user_allowed(request.env.user):
-            return _(
+            return request.env._(
                 "You are not allowed to connect AI clients. Ask your administrator "
                 "to add you to the group 'Connect AI Clients with OAuth'."
             )
