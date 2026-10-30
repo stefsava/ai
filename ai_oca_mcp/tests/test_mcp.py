@@ -81,6 +81,23 @@ class TestMcp(HttpCase):
         response = json.loads(request.content.decode("utf-8"))
         self.assertIn("error", response)
 
+    def test_notification(self):
+        request = self.url_open(
+            f"/mcp/{self.server.key}",
+            data=json.dumps(
+                {
+                    "jsonrpc": "2.0",
+                    "method": "notifications/initialized",
+                }
+            ),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.security_key}",
+            },
+        )
+        self.assertEqual(request.status_code, 202)
+        self.assertFalse(request.content)
+
     def test_correct_initialize(self):
         request = self.url_open(
             f"/mcp/{self.server.key}",

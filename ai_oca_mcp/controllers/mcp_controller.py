@@ -47,6 +47,10 @@ class McpController(http.Controller):
             )
         mcp_server_key = request.env["mcp.server.key"].sudo().browse(server_id)
         mcp_server_key = mcp_server_key.with_user(mcp_server_key.user_id.id)
+        if "id" not in payload:
+            # A notification (such as notifications/initialized) gets no
+            # JSON-RPC response: the MCP transport answers it with a 202.
+            return request.make_response("", status=202)
         method = payload.get("method")
         if method == "initialize":
             result = {
