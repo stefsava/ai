@@ -1,4 +1,4 @@
-This module lets MCP clients such as Claude connect to an `ai_oca_mcp` server
+This module lets MCP clients such as Claude and ChatGPT connect to an `ai_oca_mcp` server
 through an OAuth sign-in, instead of a key entered by hand.
 
 When the user clicks **Connect** (or **Authenticate**) in the client, a browser
@@ -16,5 +16,5 @@ or this module is uninstalled.
 
 The module implements the parts of the
 [MCP authorization specification](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization)
-that Claude needs: the authorization code flow with PKCE (S256), protected
+that Claude and ChatGPT need: the authorization code flow with PKCE (S256), protected
 resource and authorization server metadata, and dynamic client registration.

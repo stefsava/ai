@@ -170,7 +170,12 @@ class TestMcpOAuth(HttpCase):
 
     def test_register(self):
         path = f"/mcp/{self.server.key}/oauth/register"
-        for redirect_uri in (REDIRECT_URI, "http://localhost:4567/callback"):
+        for redirect_uri in (
+            REDIRECT_URI,
+            "http://localhost:4567/callback",
+            "https://chatgpt.com/connector_platform_oauth_redirect",
+            "https://chatgpt.com/connector/oauth/abc123",
+        ):
             response = self.url_open(
                 path,
                 data=json.dumps({"redirect_uris": [redirect_uri]}),
@@ -184,6 +189,12 @@ class TestMcpOAuth(HttpCase):
             "http://localhost:4567@evil.example.com/callback",
             "http://localhost:4567/callback#fragment",
             f"{REDIRECT_URI}#fragment",
+            "https://chatgpt.com/connector/oauth/",
+            "https://chatgpt.com/connector/oauth/abc/def",
+            "https://chatgpt.com/connector/oauth/abc?x=1",
+            "https://chatgpt.com.evil.example.com/connector/oauth/abc",
+            "https://user@chatgpt.com/connector/oauth/abc",
+            "http://chatgpt.com/connector/oauth/abc",
         ):
             response = self.url_open(
                 path,

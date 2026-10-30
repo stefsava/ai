@@ -15,12 +15,16 @@ from odoo.tools.misc import hmac as odoo_hmac
 
 HMAC_SCOPE = "ai_oca_mcp_oauth"
 CODE_LIFETIME = 300  # seconds
-# Claude (web, Desktop, mobile) and Claude Code. Claude Code listens on a random
-# port, so the port of a loopback URI is ignored when matching.
+# Claude (web, Desktop, mobile), Claude Code and ChatGPT. Claude Code listens on
+# a random port, so the port of a loopback URI is ignored when matching. ChatGPT
+# returns either to a stable URI or to one URI per connector, so an allowed URI
+# ending with "/*" matches any single path segment in place of the "*".
 DEFAULT_REDIRECT_URIS = [
     "https://claude.ai/api/mcp/auth_callback",
     "http://localhost/callback",
     "http://127.0.0.1/callback",
+    "https://chatgpt.com/connector_platform_oauth_redirect",
+    "https://chatgpt.com/connector/oauth/*",
 ]
 LOOPBACK_HOSTS = ("localhost", "127.0.0.1")
 # The parameters of an authorization request that the consent form posts back.
@@ -47,6 +51,17 @@ def _match_redirect_uri(uri, allowed_uri):
         return True
     parsed = urlsplit(uri)
     allowed = urlsplit(allowed_uri)
+    if allowed.path.endswith("/*"):
+        prefix = allowed.path[:-1]
+        segment = parsed.path[len(prefix) :]
+        return (
+            parsed.scheme == allowed.scheme
+            and parsed.netloc == allowed.netloc
+            and parsed.path.startswith(prefix)
+            and bool(segment)
+            and "/" not in segment
+            and not parsed.query
+        )
     return (
         allowed.hostname in LOOPBACK_HOSTS
         and parsed.scheme == allowed.scheme
