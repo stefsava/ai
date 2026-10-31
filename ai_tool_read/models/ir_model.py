@@ -1,4 +1,5 @@
 # Copyright 2026 Quartile (https://www.quartile.co)
+# Copyright 2026 Stefano Savanelli
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
 from datetime import date
@@ -9,6 +10,21 @@ from odoo.exceptions import UserError
 from odoo.addons.ai_tool.tools import aitool
 
 MAX_LIMIT = 200
+DEFAULT_GROUP_LIMIT = 100
+MAX_GROUP_LIMIT = 500
+# PostgreSQL aggregates that return a value of the field's own kind. The ORM
+# also accepts "recordset" and "array_agg", which return the records or values
+# themselves: left out, search_read is the tool to read records.
+AGGREGATE_FUNCTIONS = (
+    "count",
+    "count_distinct",
+    "sum",
+    "avg",
+    "min",
+    "max",
+    "bool_and",
+    "bool_or",
+)
 
 
 class IrModel(models.Model):
@@ -206,6 +222,7 @@ class IrModel(models.Model):
                 "items": {"type": "object", "additionalProperties": True},
             },
             "has_more": {"type": "boolean"},
+            "total_count": {"type": "integer"},
             "inaccessible_fields": {"type": "array", "items": {"type": "string"}},
         },
     )
@@ -221,7 +238,8 @@ class IrModel(models.Model):
         IDs (``load=None``): the display name core would add is built from the
         related record's fields, which may be forbidden there. ``has_more``
         tells whether a next page exists, read with ``offset`` under the same
-        domain and order.
+        domain and order, and ``total_count`` how many records match in all,
+        so that an agent need not page through them to count.
         """
         target = self._ai_target(model)
         readable = self._ai_readable_field_names(model)
@@ -247,5 +265,156 @@ class IrModel(models.Model):
         return {
             "records": [self._ai_jsonify(row) for row in rows],
             "has_more": len(records) > limit,
+            "total_count": target.search_count(domain or []),
             "inaccessible_fields": inaccessible_fields,
+        }
+
+    def _ai_check_groupable(self, model, field_name, readable):
+        """Refuse to group or aggregate on a field the tools may not return,
+        or on one the database cannot group by (not stored)."""
+        field = self.env[model]._fields.get(field_name)
+        if not field or field_name not in readable:
+            raise UserError(
+                self.env._(
+                    "Field '%(field)s' of model '%(model)s' does not exist or "
+                    "cannot be read.",
+                    field=field_name,
+                    model=model,
+                )
+            )
+        if not field.store:
+            raise UserError(
+                self.env._(
+                    "Field '%(field)s' of model '%(model)s' is not stored: it "
+                    "cannot be grouped or aggregated.",
+                    field=field_name,
+                    model=model,
+                )
+            )
+
+    def _ai_group_value(self, value):
+        """Make a ``_read_group`` value JSON-serializable: a record becomes its
+        ID (False for none), as search_read returns relational fields, and a
+        date its ISO string."""
+        if isinstance(value, models.BaseModel):
+            return value.id or False
+        if isinstance(value, date):
+            return value.isoformat()
+        return value
+
+    @aitool(
+        input_schema={
+            "model": {"type": "string"},
+            "domain": {"type": "array"},
+        },
+        required_inputs=["model"],
+        output_schema={
+            "count": {"type": "integer"},
+        },
+    )
+    def _ai_search_count(self, model, domain=None):
+        """Count the records of ``model`` matching ``domain``, with the
+        caller's rights, without reading them."""
+        target = self._ai_target(model)
+        return {"count": target.search_count(domain or [])}
+
+    @aitool(
+        input_schema={
+            "model": {"type": "string"},
+            "domain": {"type": "array"},
+            "groupby": {"type": "array", "items": {"type": "string"}},
+            "aggregates": {"type": "array", "items": {"type": "string"}},
+            "limit": {"type": "integer", "minimum": 1, "maximum": MAX_GROUP_LIMIT},
+            "offset": {"type": "integer", "minimum": 0},
+            "order": {"type": "string"},
+        },
+        required_inputs=["model"],
+        output_schema={
+            "groups": {
+                "type": "array",
+                "items": {"type": "object", "additionalProperties": True},
+            },
+            "has_more": {"type": "boolean"},
+        },
+    )
+    def _ai_read_group(
+        self,
+        model,
+        domain=None,
+        groupby=None,
+        aggregates=None,
+        limit=DEFAULT_GROUP_LIMIT,
+        offset=0,
+        order=None,
+    ):
+        """Group the records of ``model`` matching ``domain`` and aggregate
+        their values, with the caller's rights.
+
+        ``groupby`` takes field names, with a date granularity for date fields
+        (``date_order:month``). ``aggregates`` takes ``field:function`` specs
+        and ``__count``, the default. Only fields the tools may return can be
+        grouped or aggregated: a forbidden field would show its values in the
+        group keys. Each group is an object keyed by the given specs; records
+        are their IDs, dates ISO strings. ``has_more`` tells whether a next page
+        of groups exists, read with ``offset`` under the same arguments.
+        """
+        target = self._ai_target(model)
+        readable = self._ai_readable_field_names(model)
+        groupby = list(groupby or [])
+        aggregates = list(aggregates or ["__count"])
+        for spec in groupby:
+            self._ai_check_groupable(model, spec.partition(":")[0], readable)
+        for spec in aggregates:
+            if spec == "__count":
+                continue
+            field_name, _sep, function = spec.partition(":")
+            if function not in AGGREGATE_FUNCTIONS:
+                raise UserError(
+                    self.env._(
+                        "Aggregate '%(spec)s' is not supported: use "
+                        "'field:function' with one of %(functions)s, or '__count'.",
+                        spec=spec,
+                        functions=", ".join(AGGREGATE_FUNCTIONS),
+                    )
+                )
+            self._ai_check_groupable(model, field_name, readable)
+        specs = groupby + aggregates
+        # The ORM also sorts groups by an aggregate left out of the specs,
+        # which could be one on a forbidden field: keep the order to the specs.
+        for order_part in (order or "").split(","):
+            term = order_part.split()[0] if order_part.strip() else None
+            if term and term not in specs:
+                raise UserError(
+                    self.env._(
+                        "Order term '%(term)s' must be one of the groupby or "
+                        "aggregates specs.",
+                        term=term,
+                    )
+                )
+        # As in search_read, the schema bounds are not enforced by the caller.
+        if not limit or limit < 1 or limit > MAX_GROUP_LIMIT:
+            limit = MAX_GROUP_LIMIT
+        try:
+            # One group past the page tells whether there is a next one.
+            rows = target._read_group(
+                domain or [],
+                groupby,
+                aggregates,
+                offset=offset or 0,
+                limit=limit + 1,
+                order=order or None,
+            )
+        except ValueError as e:
+            # An unknown granularity or an order not on a spec: the agent can
+            # correct the call from the message.
+            raise UserError(str(e)) from e
+        return {
+            "groups": [
+                {
+                    spec: self._ai_group_value(value)
+                    for spec, value in zip(specs, row, strict=True)
+                }
+                for row in rows[:limit]
+            ],
+            "has_more": len(rows) > limit,
         }

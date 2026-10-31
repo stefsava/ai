@@ -20,3 +20,7 @@ values on purpose. Each case below still lets a forbidden value through:
 One more limit, which leaks nothing: a requested field that is forbidden,
 binary or restricted is simply missing from the records, with no reason given;
 `get_fields` tells them apart.
+
+`read_group` sorts groups on a many2one by the related model's order, which
+may depend on a forbidden field of that model, and does not offer `having` (a
+filter on the aggregates) yet.

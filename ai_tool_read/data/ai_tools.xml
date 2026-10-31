@@ -32,7 +32,8 @@
             field list, the stored fields are returned; ask for computed ones
             explicitly. "has_more" tells whether more records match: read the
             next page with the offset increased by the limit, keeping the same
-            domain and order. Relational fields are returned as record IDs; read
+            domain and order; "total_count" tells how many records match in
+            all, so do not page through records to count them. Relational fields are returned as record IDs; read
             the related model to get the details of those records. Dates and
             times are in UTC. A requested field missing from the records is not
             available (forbidden to AI, binary, or not readable for the current
@@ -43,6 +44,40 @@
         </field>
         <field name="model_id" ref="base.model_ir_model" />
         <field name="function_name">_ai_search_read</field>
+        <field name="kind">generic</field>
+    </record>
+    <record id="search_count_tool" model="ai.tool">
+        <field name="name">search_count</field>
+        <field name="description">
+            Count the records of a model matching an optional Odoo domain, such
+            as [["is_company", "=", true]], without reading them. Use it for
+            "how many" questions instead of paging through search_read.
+        </field>
+        <field name="model_id" ref="base.model_ir_model" />
+        <field name="function_name">_ai_search_count</field>
+        <field name="kind">generic</field>
+    </record>
+    <record id="read_group_tool" model="ai.tool">
+        <field name="name">read_group</field>
+        <field name="description">
+            Group the records of a model matching an optional Odoo domain and
+            compute totals per group, in the database. Use it for totals,
+            averages, counts per category and distributions over time instead
+            of reading and adding up records. "groupby" lists field names; a
+            date field takes a granularity: "date_order:month" (day, week,
+            month, quarter, year). "aggregates" lists "field:function" specs,
+            with function one of count, count_distinct, sum, avg, min, max,
+            bool_and, bool_or, and "__count" for the number of records (the
+            default). Without "groupby", one group sums up all matching records.
+            Each group is an object keyed by those specs; relational values are
+            record IDs, so read the related model for their names. "order" sorts
+            the groups by a spec, such as "amount_total:sum desc". At most 500
+            groups are returned (100 by default); "has_more" tells whether more
+            exist: read them with the offset increased by the limit. Only fields
+            listed by get_fields, and stored, can be grouped or aggregated.
+        </field>
+        <field name="model_id" ref="base.model_ir_model" />
+        <field name="function_name">_ai_read_group</field>
         <field name="kind">generic</field>
     </record>
 </odoo>
