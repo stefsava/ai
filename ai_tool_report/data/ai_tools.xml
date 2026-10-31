@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <record id="list_reports_tool" model="ai.tool">
+        <field name="name">list_reports</field>
+        <field name="description">
+            List the printable reports (invoices, quotations, delivery slips...)
+            that can be read with render_report, optionally for one model such
+            as account.move. Each entry gives the technical "report" name to
+            pass to render_report, its label and its model.
+        </field>
+        <field name="model_id" ref="base.model_ir_actions_report" />
+        <field name="function_name">_ai_list_reports</field>
+        <field name="kind">generic</field>
+    </record>
+    <record id="render_report_tool" model="ai.tool">
+        <field name="name">render_report</field>
+        <field name="description">
+            Render a report listed by list_reports for up to 10 records of its
+            model, given by ID, and return the printed document as plain text,
+            with "pdf_url", a link to the PDF the user can open in a browser
+            where they are logged in to Odoo. Give the link to the user when
+            they ask for the document itself. Long documents are cut, and
+            "truncated" tells so: render fewer records at a time.
+        </field>
+        <field name="model_id" ref="base.model_ir_actions_report" />
+        <field name="function_name">_ai_render_report</field>
+        <field name="kind">generic</field>
+    </record>
+</odoo>
